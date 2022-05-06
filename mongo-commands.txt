@@ -1,0 +1,109 @@
+mongo	//启动client
+
+show dbs		
+
+db	//查看当前所在库
+use db_name	//切换到XXX库
+db.dropDatabase()	//删除当前所在库
+
+show collections	//显示当前库的所有集合
+
+插入：
+db.XXX.insertOne(doc)	//插入一条文档（json对象）到当前库中的XXX collection
+
+删除：谨慎使用，通常移除的数据仅添加一条字段removed或{remove : true}
+db.XXX.remove({x : 999})
+
+查询：
+db.XXX.find()	//查询当前集合中所有文档
+db.XXX.findOne()	//返回一条数据
+db.users.find({}, {‘name’ : 1, ‘skills’ : 1});	//第一个{} 放where条件 第二个{} 指定那些列显示和不显示 （0表示不显示 1表示显示)（_id默认展示）
+
+条件查询：
+
+1.简单的等于:
+select name, age, skills from users where name = ‘hurry’;
+db.users.find({‘name’ : ‘hurry’},{‘name’ : 1, ‘age’ : 1, ‘skills’ : 1});
+
+2.使用and
+select name, age, skills from users where name = ‘hurry’ and age = 18;
+db.users.find($and: [{name : ‘hurry’}, {age : 18}],{‘name’ : 1, ‘age’ : 1, ‘skills’ : 1});
+db.users.find({‘name’ : ‘hurry’, ‘age’ : 18},{‘name’ : 1, ‘age’ : 1, ‘skills’ : 1});    //简化用法
+
+3.使用$or/$nor 数组！
+select name, age, skills from users where name = ‘hurry’ or age = 18;
+db.users.find({ ‘$or’ : [{‘name’ : ‘hurry’}, {‘age’ : 18}] },{‘name’ : 1, ‘age’ : 1, ‘skills’ : 1});
+
+4.<, <=, >, >= , != ($lt, $lte, $gt, $gte, $ne)
+//select * from users where age >= 20 and age <= 30;
+db.users.find({‘age’ : {$gte:20, $lte : 30}});
+db.users.find({‘age’ : {$ne:20}});      //返回所有age不等于20的数据，$ne只可操作值，不可操作运算符（区别于$not）
+
+5.数组查询：
+//按下标查询：
+db.sang_collect.find({"books.2":"水浒传"})
+//按长度查询：$size
+db.sang_collect.find({books:{$size:3}})     //返回book数组属性长度为3的数据
+
+//使用in, not in, all ($in,$nin,$all) 数组！	in:返回某个字段中包含数组中的值中的一个的数据， all：返回某个字段中包含数组中的所有值的数据
+select * from users where age in (10, 22, 26);
+db.users.find({‘age’ : {‘$in’ : [10, 22, 26]}});
+db.users.find({‘courses’ : {‘$all’ : ['math', 'English', 'chemistry']}});
+
+6.匹配null
+select * from users where age is null;
+db.users.find({‘age’ : null);
+
+7.like (mongoDB 支持正则表达式)
+select * from users where name like “%hurry%”;
+db.users.find({name:/hurry/});
+select * from users where name like “hurry%”;
+db.users.find({name:/^hurry/});
+
+8.子文档查询
+db.XXX.find({"courses.1": "math"})	//{'courses' : ['English' , 'math' ] 返回XXX中courses的第2项(下标为1)为math的数据
+db.XXX.find({"grade.math": 90})		//返回grade中的math项为90的数据
+
+9.分页查询：
+db.XXX.find().count()	返回查询数
+.limit(20)	返回几条数据
+.skip(2*20)	返回值跳过前几条数据
+.sort({"name":1})	正序排序
+.sort({"name":-1})	倒叙排序 
+
+10.使用$not: 对其他运算符取反（仅用于对运算符操作）
+db.inventory.find( { price: { $not: { $gt: 1.99 } } } )     //返回所有存在price属性且<=1.99的数据
+
+11.使用$slice: 截取返回的查询数组中的n条数据：
+db.sang_collect.find({},{books:{$slice:2}})     //返回查询结果的前两条，-2为后两条
+db.sang_collect.find({},{books:{$slice:[1,3]}})     //返回查询数组的第2个到第4个元素（下标为1,3）
+
+12.使用$exist: true返回包含字段的文档，包括null，false返回不包含字段的文档
+db.records.find( { name: { $exists: true } } )
+
+修改：
+db.XXX.update({x:1},{x:99})	//第一个参数：更新条件，第二个参数：被更新的数据
+db.XXX.updateOne({x:1},{x:99})		//只更新一条数据
+
+修改器：
+1. $set	//修改一个字段的值，如果这个字段不存在，则创建它。
+db.XXX.update({name:"三国演义"},{$set:{"author.name":"明代罗贯中"}})
+2. $unset		//删除一个字段
+db.XXX.update({name:"三国演义"},{$unset:{"author.name":"明代罗贯中"}})
+3. $inc	//增加已有键的值，如果该键不存在就新创建一个。
+db.products.update({'price' : 220}, {$inc : {'price' : 1}})		//price+1
+
+数组修改器：
+1. $push	//向已有数组末尾追加元素，要是不存在就创建一个数组
+db.products.update({'type' : {$in : ['case']}}, {$push : {'type' : 'test'}})	
+2. $pull	//按条件删除数组中的某个元素
+db.products.update({'type' : {$in : ['case']}}, {$pull : {'type' : 'test'}})
+3. $pop	//从数组的开头或末尾删除数组中的1个数据: 1表示从comments数组的末尾删除一条数据，-1表示从comments数组的开头删除一条数据。
+db.products.update({'type' : {$in : ['case']}}, {$pop : {'type' : 1}})
+4. .$	//条件查询出的下标，通过$符号作为该下标
+db.products.update({'type' : 'test'}, {$set : {'type.$' : 'update'}})		//{'type : ['case' , 'test']} --> {'type : ['case' , 'update']}
+ 
+
+
+
+
